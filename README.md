@@ -21,6 +21,7 @@ Modifier le Google Sheet « Poseurs_Homemat », onglet **Poseurs**. Les changeme
 
 - `actif` : `non` masque le poseur, toute autre valeur (ou vide) l'affiche.
 - `latitude` / `longitude` : facultatives. Si elles sont vides, la carte les calcule à partir de l'adresse.
+- `specialite` (colonne K, facultative) : métier affiché sous le nom, ex. Menuiserie.
 - Ne pas renommer les intitulés de colonnes ni l'onglet.
 
 Le lien du CSV est défini dans `index.html`, constante `CONFIG.csvUrl`.
