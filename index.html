@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Poseurs de confiance Homemat</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root {
+    --gold: #ECB51D;
+    --gold-soft: #FBF1D3;
+    --navy: #08182E;
+    --navy-2: #1B2C45;
+    --ink: #1F2937;
+    --muted: #6B7280;
+    --line: #E5E7EB;
+    --bg: #FFFFFF;
+    --panel: #F8F9FB;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: 'Montserrat', system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    height: 100vh;
+    min-height: 520px;
+  }
+
+  /* ---------- Panneau latéral ---------- */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+  }
+  .panel-head {
+    padding: 22px 20px 16px;
+    background: var(--navy);
+    color: #fff;
+  }
+  .panel-head h1 {
+    margin: 0 0 4px;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: .2px;
+  }
+  .panel-head h1 span { color: var(--gold); }
+  .panel-head p {
+    margin: 0 0 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: rgba(255,255,255,.72);
+  }
+  .search { position: relative; }
+  .search-row { display: flex; gap: 8px; }
+  .search input {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    padding: 0 38px 0 14px;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    background: #fff;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .search input:focus { border-color: var(--gold); }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .clear-btn {
+    position: absolute;
+    right: 60px;
+    top: 0;
+    height: 44px;
+    width: 32px;
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 20px;
+    cursor: pointer;
+    display: none;
+  }
+  .clear-btn.show { display: block; }
+  .locate-btn {
+    flex: 0 0 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--gold);
+    color: var(--navy);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: filter .15s;
+  }
+  .locate-btn:hover { filter: brightness(1.06); }
+  .locate-btn svg { width: 20px; height: 20px; }
+  .suggest {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50px;
+    z-index: 1000;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(8,24,46,.22);
+    display: none;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .suggest.show { display: block; }
+  .suggest li {
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: var(--ink);
+    cursor: pointer;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .suggest li small { color: var(--muted); margin-left: auto; font-size: 11.5px; white-space: nowrap; }
+  .suggest li.active, .suggest li:hover { background: var(--gold-soft); }
+  .suggest .ico { flex: 0 0 16px; color: var(--muted); }
+  .suggest .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .status {
+    padding: 12px 20px;
+    font-size: 12.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    background: #fff;
+  }
+  .status strong { color: var(--navy); }
+
+  .list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0;
+    padding: 10px 12px 16px;
+    list-style: none;
+  }
+  .card {
+    position: relative;
+    padding: 14px 14px 12px;
+    margin-bottom: 8px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .card:hover { border-color: #D5D9E0; box-shadow: 0 4px 14px rgba(8,24,46,.07); }
+  .card.selected { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold-soft); }
+  .card.near::before {
+    content: '';
+    position: absolute;
+    left: -1px; top: 14px; bottom: 14px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--gold);
+  }
+  .card-top { display: flex; align-items: flex-start; gap: 10px; }
+  .card h2 {
+    margin: 0;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1.3;
+  }
+  .card .company { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+  .dist {
+    margin-left: auto;
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--navy);
+    color: var(--gold);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .card .addr { font-size: 12.5px; color: var(--ink); margin: 8px 0 10px; line-height: 1.4; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--line);
+    color: var(--navy);
+    background: #fff;
+    transition: background .15s, border-color .15s;
+  }
+  .btn:hover { background: var(--panel); }
+  .btn.primary { background: var(--gold); border-color: var(--gold); }
+  .btn.primary:hover { filter: brightness(1.05); background: var(--gold); }
+  .btn svg { width: 14px; height: 14px; }
+  .empty { padding: 30px 16px; text-align: center; font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* ---------- Carte ---------- */
+  .map-wrap { position: relative; min-height: 0; }
+  #map { position: absolute; inset: 0; background: #EEF0F3; }
+  .leaflet-tile-pane { filter: grayscale(.55) contrast(.95) brightness(1.04); }
+  .leaflet-container { font-family: 'Montserrat', system-ui, sans-serif; }
+  .pin { background: none; border: 0; }
+  .pin svg { display: block; filter: drop-shadow(0 2px 3px rgba(8,24,46,.35)); transition: transform .15s; transform-origin: 50% 100%; }
+  .pin.hot svg { transform: scale(1.25); }
+  .me-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #2563EB;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 6px rgba(37,99,235,.22), 0 2px 6px rgba(0,0,0,.3);
+  }
+  .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 10px 30px rgba(8,24,46,.2); }
+  .leaflet-popup-content { margin: 14px 16px; font-size: 13px; line-height: 1.45; min-width: 210px; }
+  .pop h3 { margin: 0; font-size: 14.5px; color: var(--navy); }
+  .pop .company { color: var(--muted); font-size: 12.5px; }
+  .pop .addr { margin: 8px 0 10px; }
+  .pop .actions { gap: 6px; }
+  .pop a.btn { color: var(--navy); }
+  .loader {
+    position: absolute;
+    left: 50%; top: 16px;
+    transform: translateX(-50%);
+    z-index: 500;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: var(--navy);
+    color: #fff;
+    font-size: 12.5px;
+    box-shadow: 0 6px 18px rgba(8,24,46,.25);
+    display: none;
+  }
+  .loader.show { display: block; }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 760px) {
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 52vh auto auto;
+      height: auto;
+    }
+    .panel { display: contents; }
+    .panel-head { order: 1; padding: 18px 16px 14px; position: relative; z-index: 1100; }
+    .map-wrap { order: 2; min-height: 320px; }
+    .status { order: 3; padding: 12px 16px; }
+    .list { order: 4; overflow: visible; padding: 10px 12px 20px; background: var(--panel); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel">
+    <div class="panel-head">
+      <h1>Nos poseurs <span>de confiance</span></h1>
+      <p>Saisissez votre ville, votre code postal ou votre adresse pour trouver le poseur le plus proche.</p>
+      <div class="search">
+        <div class="search-row">
+          <input id="q" type="search" autocomplete="off" placeholder="Ville, code postal ou adresse" aria-label="Rechercher une localisation">
+          <button class="clear-btn" id="clear" type="button" aria-label="Effacer la recherche">×</button>
+          <button class="locate-btn" id="locate" type="button" title="Me localiser" aria-label="Me localiser">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+        </div>
+        <ul class="suggest" id="suggest" role="listbox"></ul>
+      </div>
+    </div>
+    <div class="status" id="status">Chargement des poseurs…</div>
+    <ul class="list" id="list"></ul>
+  </aside>
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="loader" id="loader"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script>
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
+const CONFIG = {
+  // Lien CSV de l'onglet « Poseurs » publié sur le web (Google Sheets)
+  csvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTgw8QVEIAkyKtlMNDJJ92HxR9Qha9JaJbNc8x4PzhuYorAydu-FKCQ8XzdruHtVk59orfzzMYW-BKP/pub?gid=2066331676&single=true&output=csv',
+  nearestCount: 3,                 // poseurs mis en avant après une recherche
+  franceCenter: [46.6, 2.4],
+  franceZoom: 6
+};
+const GEO_SEARCH = 'https://data.geopf.fr/geocodage/search';     // IGN Géoplateforme, gratuit, sans clé
+const GEO_COMMUNES = 'https://geo.api.gouv.fr/communes';          // codes postaux, gratuit, sans clé
+
+/* =========================================================
+   OUTILS
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const num = v => { const n = parseFloat(String(v ?? '').replace(',', '.').trim()); return Number.isFinite(n) ? n : null; };
+const telHref = t => 'tel:' + String(t).replace(/[^\d+]/g, '');
+const safeMail = m => /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(String(m).trim()) ? String(m).trim() : '';
+function km(a, b) {
+  const R = 6371, r = Math.PI / 180;
+  const dLat = (b[0] - a[0]) * r, dLng = (b[1] - a[1]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const fmtKm = d => d < 1 ? '< 1 km' : (d < 10 ? d.toFixed(1).replace('.', ',') : Math.round(d)) + ' km';
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+const cache = {
+  get(k) { try { return JSON.parse(localStorage.getItem('hm-geo:' + k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem('hm-geo:' + k, JSON.stringify(v)); } catch (e) {} }
+};
+function showLoader(txt) { const l = $('loader'); l.textContent = txt || ''; l.classList.toggle('show', !!txt); }
+
+const ICONS = {
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>',
+  route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>',
+  place: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+  person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'
+};
+
+/* =========================================================
+   CARTE (Plan IGN, gratuit, sans clé)
+   ========================================================= */
+const map = L.map('map', { zoomControl: false, scrollWheelZoom: true }).setView(CONFIG.franceCenter, CONFIG.franceZoom);
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>');
+L.tileLayer(
+  'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+  { minZoom: 3, maxZoom: 19, attribution: '© <a href="https://www.ign.fr/" target="_blank" rel="noopener">IGN</a> Géoplateforme' }
+).addTo(map);
+
+function pinIcon(hot) {
+  return L.divIcon({
+    className: 'pin' + (hot ? ' hot' : ''),
+    iconSize: [30, 40],
+    iconAnchor: [15, 40],
+    popupAnchor: [0, -36],
+    html: '<svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 1C7.3 1 1 7.2 1 14.9 1 25.3 15 39 15 39s14-13.7 14-24.1C29 7.2 22.7 1 15 1z" fill="#08182E" stroke="#ECB51D" stroke-width="2"/><circle cx="15" cy="15" r="5.5" fill="#ECB51D"/></svg>'
+  });
+}
+const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
+
+/* =========================================================
+   ÉTAT
+   ========================================================= */
+let poseurs = [];
+let origin = null;          // { latlng:[lat,lng], label }
+let meMarker = null;
+let selectedId = null;
+
+/* =========================================================
+   DONNÉES
+   ========================================================= */
+function pick(row, ...keys) {
+  for (const k of keys) {
+    const found = Object.keys(row).find(h => norm(h).replace(/[\s_-]+/g, '') === norm(k).replace(/[\s_-]+/g, ''));
+    if (found && String(row[found]).trim() !== '') return String(row[found]).trim();
+  }
+  return '';
+}
+
+function loadCsv() {
+  return new Promise((resolve, reject) => {
+    Papa.parse(CONFIG.csvUrl + (CONFIG.csvUrl.includes('?') ? '&' : '?') + 't=' + Date.now(), {
+      download: true,
+      header: true,
+      skipEmptyLines: 'greedy',
+      complete: r => resolve(r.data),
+      error: reject
+    });
+  });
+}
+
+async function geocodeAddress(text) {
+  const key = norm(text);
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const res = await fetch(GEO_SEARCH + '?limit=1&q=' + encodeURIComponent(text));
+  if (!res.ok) return null;
+  const j = await res.json();
+  const f = j.features && j.features[0];
+  if (!f) return null;
+  const ll = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+  cache.set(key, ll);
+  return ll;
+}
+
+async function init() {
+  let rows;
+  try {
+    rows = await loadCsv();
+  } catch (e) {
+    $('status').textContent = 'Impossible de charger la liste des poseurs pour le moment.';
+    return;
+  }
+
+  poseurs = rows.map((r, i) => ({
+    id: i,
+    nom: pick(r, 'nom', 'name'),
+    entreprise: pick(r, 'entreprise', 'societe', 'société'),
+    tel: pick(r, 'telephone', 'téléphone', 'tel'),
+    email: pick(r, 'email', 'mail'),
+    adresse: pick(r, 'adresse'),
+    cp: pick(r, 'code_postal', 'code postal', 'cp'),
+    ville: pick(r, 'ville', 'commune'),
+    actif: norm(pick(r, 'actif')),
+    lat: num(pick(r, 'latitude', 'lat')),
+    lng: num(pick(r, 'longitude', 'lng', 'lon'))
+  })).filter(p => (p.nom || p.entreprise) && p.actif !== 'non');
+
+  // Coordonnées manquantes : calcul automatique à partir de l'adresse
+  const missing = poseurs.filter(p => p.lat === null || p.lng === null);
+  if (missing.length) showLoader('Placement des poseurs sur la carte…');
+  for (const p of missing) {
+    const txt = [p.adresse, p.cp, p.ville].filter(Boolean).join(' ');
+    if (!txt) continue;
+    try {
+      const ll = await geocodeAddress(txt);
+      if (ll) { p.lat = ll[0]; p.lng = ll[1]; }
+    } catch (e) {}
+  }
+  showLoader('');
+
+  poseurs.forEach(p => {
+    if (p.lat === null || p.lng === null) return;
+    p.marker = L.marker([p.lat, p.lng], { icon: pinIcon(false), title: p.nom || p.entreprise })
+      .addTo(map)
+      .bindPopup(() => popupHtml(p), { maxWidth: 280 });
+    p.marker.on('click', () => select(p.id, false));
+  });
+
+  const placed = poseurs.filter(p => p.marker);
+  if (placed.length) map.fitBounds(L.latLngBounds(placed.map(p => [p.lat, p.lng])).pad(0.15), { maxZoom: 9 });
+  render();
+}
+
+/* =========================================================
+   AFFICHAGE
+   ========================================================= */
+function addressLine(p) {
+  return [p.adresse, [p.cp, p.ville].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+}
+function actionsHtml(p) {
+  const mail = safeMail(p.email);
+  const a = [];
+  if (p.tel) a.push(`<a class="btn primary" href="${esc(telHref(p.tel))}">${ICONS.phone}${esc(p.tel)}</a>`);
+  if (mail) a.push(`<a class="btn" href="mailto:${esc(mail)}">${ICONS.mail}Email</a>`);
+  if (p.marker) a.push(`<a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}">${ICONS.route}Itinéraire</a>`);
+  return a.join('');
+}
+function popupHtml(p) {
+  return `<div class="pop">
+    <h3>${esc(p.nom || p.entreprise)}</h3>
+    ${p.nom && p.entreprise ? `<div class="company">${esc(p.entreprise)}</div>` : ''}
+    <div class="addr">${esc(addressLine(p))}${p.dist != null ? `<br><strong>${fmtKm(p.dist)}</strong> de votre recherche` : ''}</div>
+    <div class="actions">${actionsHtml(p)}</div>
+  </div>`;
+}
+
+function render() {
+  const list = $('list');
+  let items = poseurs.slice();
+  if (origin) {
+    items.forEach(p => { p.dist = p.marker ? km(origin.latlng, [p.lat, p.lng]) : null; });
+    items.sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9));
+  } else {
+    items.forEach(p => { p.dist = null; });
+    items.sort((a, b) => norm(a.ville).localeCompare(norm(b.ville)) || norm(a.nom).localeCompare(norm(b.nom)));
+  }
+  const nearIds = origin ? new Set(items.filter(p => p.dist != null).slice(0, CONFIG.nearestCount).map(p => p.id)) : new Set();
+
+  const n = poseurs.length;
+  $('status').innerHTML = !n
+    ? 'Aucun poseur à afficher pour le moment.'
+    : origin
+      ? `<strong>${n}</strong> poseur${n > 1 ? 's' : ''} triés par distance de <strong>${esc(origin.label)}</strong>`
+      : `<strong>${n}</strong> poseur${n > 1 ? 's' : ''} de confiance`;
+
+  if (!n) { list.innerHTML = '<li class="empty">La liste des poseurs sera bientôt disponible.</li>'; return; }
+
+  list.innerHTML = items.map(p => `
+    <li class="card${nearIds.has(p.id) ? ' near' : ''}${selectedId === p.id ? ' selected' : ''}" data-id="${p.id}">
+      <div class="card-top">
+        <div>
+          <h2>${esc(p.nom || p.entreprise)}</h2>
+          ${p.nom && p.entreprise ? `<div class="company">${esc(p.entreprise)}</div>` : ''}
+        </div>
+        ${p.dist != null ? `<span class="dist">${fmtKm(p.dist)}</span>` : ''}
+      </div>
+      <div class="addr">${esc(addressLine(p))}</div>
+      <div class="actions">${actionsHtml(p)}</div>
+    </li>`).join('');
+
+  poseurs.forEach(p => p.marker && p.marker.setIcon(pinIcon(nearIds.has(p.id))));
+}
+
+function select(id, fly = true) {
+  selectedId = id;
+  const p = poseurs.find(x => x.id === id);
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', +c.dataset.id === id));
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (card && !fly) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (p && p.marker && fly) {
+    map.flyTo([p.lat, p.lng], Math.max(map.getZoom(), 12), { duration: .6 });
+    setTimeout(() => p.marker.openPopup(), 650);
+    if (window.matchMedia('(max-width: 760px)').matches) document.querySelector('.map-wrap').scrollIntoView({ behavior: 'smooth' });
+  }
+}
+
+$('list').addEventListener('click', e => {
+  if (e.target.closest('a')) return;
+  const card = e.target.closest('.card');
+  if (card) select(+card.dataset.id, true);
+});
+
+/* =========================================================
+   RECHERCHE
+   ========================================================= */
+const input = $('q'), sug = $('suggest');
+let suggestions = [], active = -1, reqId = 0;
+
+function setOrigin(latlng, label) {
+  origin = { latlng, label };
+  if (meMarker) map.removeLayer(meMarker);
+  meMarker = L.marker(latlng, { icon: meIcon, zIndexOffset: 1000, interactive: false }).addTo(map);
+  selectedId = null;
+  render();
+  const near = poseurs.filter(p => p.dist != null).slice(0, CONFIG.nearestCount);
+  const pts = [latlng, ...near.map(p => [p.lat, p.lng])];
+  if (pts.length > 1) map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 12 });
+  else map.setView(latlng, 10);
+  $('list').scrollTop = 0;
+}
+
+function resetSearch() {
+  origin = null;
+  if (meMarker) { map.removeLayer(meMarker); meMarker = null; }
+  input.value = '';
+  $('clear').classList.remove('show');
+  hideSuggest();
+  render();
+  const placed = poseurs.filter(p => p.marker);
+  if (placed.length) map.fitBounds(L.latLngBounds(placed.map(p => [p.lat, p.lng])).pad(0.15), { maxZoom: 9 });
+}
+
+async function fetchPlaces(q) {
+  // Code postal seul : liste des communes correspondantes
+  if (/^\d{5}$/.test(q)) {
+    const r = await fetch(`${GEO_COMMUNES}?codePostal=${q}&fields=nom,centre,codesPostaux&limit=8`);
+    if (r.ok) {
+      const j = await r.json();
+      const out = j.filter(c => c.centre).map(c => ({ type: 'place', label: c.nom, sub: q, latlng: [c.centre.coordinates[1], c.centre.coordinates[0]] }));
+      if (out.length) return out;
+    }
+  }
+  const r = await fetch(`${GEO_SEARCH}?limit=6&autocomplete=1&q=${encodeURIComponent(q)}`);
+  if (!r.ok) return [];
+  const j = await r.json();
+  return (j.features || []).map(f => ({
+    type: 'place',
+    label: f.properties.label,
+    sub: f.properties.postcode || '',
+    latlng: [f.geometry.coordinates[1], f.geometry.coordinates[0]]
+  }));
+}
+
+function matchPoseurs(q) {
+  const nq = norm(q);
+  if (nq.length < 2) return [];
+  return poseurs
+    .filter(p => norm(p.nom).includes(nq) || norm(p.entreprise).includes(nq))
+    .slice(0, 3)
+    .map(p => ({ type: 'poseur', label: p.nom || p.entreprise, sub: p.ville, id: p.id }));
+}
+
+function showSuggest(items) {
+  suggestions = items; active = -1;
+  if (!items.length) { hideSuggest(); return; }
+  sug.innerHTML = items.map((s, i) => `
+    <li role="option" data-i="${i}">
+      <span class="ico">${s.type === 'poseur' ? ICONS.person : ICONS.place}</span>
+      <span class="label">${esc(s.label)}</span>
+      ${s.sub ? `<small>${esc(s.sub)}</small>` : ''}
+    </li>`).join('');
+  sug.classList.add('show');
+}
+function hideSuggest() { sug.classList.remove('show'); suggestions = []; active = -1; }
+function highlight(i) {
+  active = i;
+  sug.querySelectorAll('li').forEach((li, k) => li.classList.toggle('active', k === i));
+}
+function choose(s) {
+  hideSuggest();
+  if (!s) return;
+  if (s.type === 'poseur') { input.value = s.label; select(s.id, true); return; }
+  input.value = s.label;
+  setOrigin(s.latlng, s.label);
+}
+
+const onType = debounce(async () => {
+  const q = input.value.trim();
+  $('clear').classList.toggle('show', !!q);
+  if (q.length < 2) { hideSuggest(); return; }
+  const id = ++reqId;
+  const own = matchPoseurs(q);
+  let places = [];
+  if (q.length >= 3) { try { places = await fetchPlaces(q); } catch (e) {} }
+  if (id !== reqId) return;
+  showSuggest([...own, ...places]);
+}, 250);
+
+input.addEventListener('input', onType);
+input.addEventListener('keydown', async e => {
+  if (e.key === 'ArrowDown' && suggestions.length) { e.preventDefault(); highlight((active + 1) % suggestions.length); }
+  else if (e.key === 'ArrowUp' && suggestions.length) { e.preventDefault(); highlight((active - 1 + suggestions.length) % suggestions.length); }
+  else if (e.key === 'Escape') hideSuggest();
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (suggestions.length) { choose(suggestions[Math.max(active, 0)]); return; }
+    const q = input.value.trim();
+    if (q.length < 2) return;
+    try { const r = await fetchPlaces(q); if (r[0]) choose(r[0]); } catch (err) {}
+  }
+});
+sug.addEventListener('mousedown', e => {
+  const li = e.target.closest('li');
+  if (li) { e.preventDefault(); choose(suggestions[+li.dataset.i]); }
+});
+input.addEventListener('blur', () => setTimeout(hideSuggest, 150));
+$('clear').addEventListener('click', resetSearch);
+input.addEventListener('search', () => { if (!input.value) resetSearch(); });
+
+$('locate').addEventListener('click', () => {
+  if (!navigator.geolocation) { alert('La géolocalisation n\'est pas disponible sur cet appareil.'); return; }
+  showLoader('Localisation en cours…');
+  navigator.geolocation.getCurrentPosition(
+    pos => { showLoader(''); input.value = 'Ma position'; $('clear').classList.add('show'); setOrigin([pos.coords.latitude, pos.coords.longitude], 'votre position'); },
+    () => { showLoader(''); alert('Impossible de vous localiser. Saisissez plutôt votre ville ou votre code postal.'); },
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+  );
+});
+
+init();
+</script>
+</body>
+</html>
